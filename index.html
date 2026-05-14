@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student Result Management System</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+body { background: #f5f7fa; padding: 20px; color: #333; }
+.container { max-width: 1100px; margin: auto; }
+
+h1 { text-align: center; color: #1e293b; margin-bottom: 20px; }
+
+.grid { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; }
+.box { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+
+input, button, select {
+  width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #d1d5db;
+  border-radius: 8px; font-size: 15px;
+}
+button {
+  background: #2563eb; color: white; border: none; cursor: pointer; font-weight: 600;
+}
+button:hover { background: #1d4ed8; }
+button.danger { background: #ef4444; }
+button.success { background: #10b981; }
+
+.stats {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;
+}
+.stat-card {
+  background: white; padding: 15px; border-radius: 12px; text-align: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+.stat-card h3 { color: #6b7280; font-size: 14px; }
+.stat-card p { font-size: 24px; font-weight: 700; color: #1e293b; margin-top: 5px; }
+
+table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb; }
+th { background: #f9fafb; color: #374151; }
+.pass { color: #10b981; font-weight: 600; }
+.fail { color: #ef4444; font-weight: 600; }
+
+.tabs { display: flex; gap: 10px; margin-bottom: 15px; }
+.tab {
+  padding: 10px 20px; background: #e5e7eb; border-radius: 8px; cursor: pointer; font-weight: 500;
+}
+.tab.active { background: #2563eb; color: white; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+@media(max-width: 768px) {
+  .grid { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>📊 Student Result Management System</h1>
+  
+  <div class="stats">
+    <div class="stat-card">
+      <h3>Total Students</h3>
+      <p id="totalStudents">0</p>
+    </div>
+    <div class="stat-card">
+      <h3>Pass %</h3>
+      <p id="passPercent">0%</p>
+    </div>
+    <div class="stat-card">
+      <h3>Top Score</h3>
+      <p id="topScore">0%</p>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('add')">Add Student</div>
+    <div class="tab" onclick="switchTab('view')">View Results</div>
+  </div>
+
+  <div id="add" class="tab-content active">
+    <div class="grid">
+      <div class="box">
+        <h3>Add New Student</h3>
+        <input type="number" id="rollNo" placeholder="Roll No">
+        <input type="text" id="name" placeholder="Student Name">
+        <input type="number" id="m1" placeholder="Maths Marks">
+        <input type="number" id="m2" placeholder="Physics Marks">
+        <input type="number" id="m3" placeholder="Chemistry Marks">
+        <input type="number" id="m4" placeholder="English Marks">
+        <input type="number" id="m5" placeholder="CS Marks">
+        <button onclick="addStudent()">Add Student</button>
+      </div>
+
+      <div class="box">
+        <h3>Quick Actions</h3>
+        <input type="text" id="search" placeholder="Search by Roll No or Name" onkeyup="searchStudent()">
+        <button class="success" onclick="showTopper()">Show Topper</button>
+        <button onclick="filterPass(true)">Show Pass Students</button>
+        <button onclick="filterPass(false)">Show Fail Students</button>
+        <button onclick="showAll()">Show All</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="view" class="tab-content">
+    <div class="box">
+      <h3>Student Results</h3>
+      <table id="resultTable">
+        <thead>
+          <tr>
+            <th>Roll No</th><th>Name</th><th>Total</th><th>%</th><th>Grade</th><th>Status</th><th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="resultBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+let students = JSON.parse(localStorage.getItem('students')) || [];
+const subjects = ['Maths', 'Physics', 'Chemistry', 'English', 'CS'];
+const PASS_MARK = 35;
+
+function saveData() {
+  localStorage.setItem('students', JSON.stringify(students));
+  updateStats();
+}
+
+function calculateResult(marks) {
+  let total = marks.reduce((a, b) => a + b, 0);
+  let percentage = total / 5;
+  
+  let grade;
+  if (percentage >= 90) grade = 'A+';
+  else if (percentage >= 80) grade = 'A';
+  else if (percentage >= 70) grade = 'B';
+  else if (percentage >= 60) grade = 'C';
+  else if (percentage >= 40) grade = 'D';
+  else grade = 'F';
+  
+  let isPass = marks.every(m => m >= PASS_MARK);
+  return { total, percentage: percentage.toFixed(2), grade, isPass };
+}
+
+function addStudent() {
+  const rollNo = parseInt(document.getElementById('rollNo').value);
+  const name = document.getElementById('name').value.trim();
+  const marks = [
+    parseInt(document.getElementById('m1').value),
+    parseInt(document.getElementById('m2').value),
+    parseInt(document.getElementById('m3').value),
+    parseInt(document.getElementById('m4').value),
+    parseInt(document.getElementById('m5').value)
+  ];
+
+  if (!rollNo || !name || marks.some(isNaN)) {
+    alert('Please fill all fields correctly');
+    return;
+  }
+  
+  if (students.some(s => s.rollNo === rollNo)) {
+    alert('Student with this Roll No already exists!');
+    return;
+  }
+
+  const result = calculateResult(marks);
+  students.push({ rollNo, name, marks, ...result });
+  
+  saveData();
+  displayStudents();
+  clearForm();
+  alert('Student added successfully!');
+}
+
+function displayStudents(list = students) {
+  const tbody = document.getElementById('resultBody');
+  tbody.innerHTML = '';
+  
+  list.forEach(s => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${s.rollNo}</td>
+      <td>${s.name}</td>
+      <td>${s.total}/500</td>
+      <td>${s.percentage}%</td>
+      <td>${s.grade}</td>
+      <td class="${s.isPass ? 'pass' : 'fail'}">${s.isPass ? 'PASS' : 'FAIL'}</td>
+      <td><button class="danger" onclick="deleteStudent(${s.rollNo})">Delete</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function deleteStudent(rollNo) {
+  students = students.filter(s => s.rollNo !== rollNo);
+  saveData();
+  displayStudents();
+}
+
+function searchStudent() {
+  const keyword = document.getElementById('search').value.toLowerCase();
+  const filtered = students.filter(s => 
+    s.name.toLowerCase().includes(keyword) || 
+    s.rollNo.toString().includes(keyword)
+  );
+  displayStudents(filtered);
+}
+
+function showTopper() {
+  if (students.length === 0) {
+    alert('No students available!');
+    return;
+  }
+  const topper = students.reduce((prev, curr) => 
+    parseFloat(curr.percentage) > parseFloat(prev.percentage) ? curr : prev
+  );
+  alert(`Topper: ${topper.name}\nRoll No: ${topper.rollNo}\nPercentage: ${topper.percentage}%`);
+}
+
+function filterPass(passStatus) {
+  const filtered = students.filter(s => s.isPass === passStatus);
+  displayStudents(filtered);
+}
+
+function showAll() {
+  displayStudents();
+}
+
+function updateStats() {
+  document.getElementById('totalStudents').textContent = students.length;
+  
+  if (students.length === 0) {
+    document.getElementById('passPercent').textContent = '0%';
+    document.getElementById('topScore').textContent = '0%';
+    return;
+  }
+  
+  const passCount = students.filter(s => s.isPass).length;
+  const passPercent = ((passCount / students.length) * 100).toFixed(1);
+  const topScore = Math.max(...students.map(s => parseFloat(s.percentage))).toFixed(1);
+  
+  document.getElementById('passPercent').textContent = passPercent + '%';
+  document.getElementById('topScore').textContent = topScore + '%';
+}
+
+function clearForm() {
+  document.getElementById('rollNo').value = '';
+  document.getElementById('name').value = '';
+  for(let i=1; i<=5; i++) document.getElementById('m' + i).value = '';
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById(tab).classList.add('active');
+  if(tab === 'view') displayStudents();
+}
+
+// Initial load
+displayStudents();
+updateStats();
+</script>
+</body>
+</html>
